@@ -1,0 +1,10 @@
+.gitignore
+Changes
+LICENSE
+MANIFEST
+Makefile.PL
+README
+lib/Game/PlatformsOfPeril.pm
+pperil
+t/00-load.t
+t/pod.t
