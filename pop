@@ -1,0 +1,14 @@
+#!/usr/bin/env perl
+# pop - for test and debug from module directory
+use 5.24.0;
+use warnings;
+BEGIN { srand 42 }
+use lib qw(lib);
+use Game::PlatformsOfPeril;
+close STDERR;
+unless ( open STDERR, '>', 'log' ) {
+    say 'Could not redirect STDERR: ' . $!;
+    exit 1;
+}
+STDERR->autoflush(1);
+Game::PlatformsOfPeril::game_loop( 'levels', shift // 0, 42 );

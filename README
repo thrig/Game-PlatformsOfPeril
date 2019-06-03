@@ -12,6 +12,13 @@ black background) install and run the game via:
     cpanm Game::PlatformsOfPeril
     pperil
 
+However this does not do much as level maps are not (yet?) shipped
+with the module on CPAN. In the meantime try something like:
+
+    git clone https://github.com/thrig/Game-PlatformsOfPeril
+    cd Game-PlatformsOfPeril
+    pperil
+
 
 There is some documentation about the game:
 

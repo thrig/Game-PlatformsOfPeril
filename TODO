@@ -1,0 +1,14 @@
+ * figure out a way to install level maps somewhere sensible at that the
+   module can find on install (or additional instructions on "get a
+   directory of level maps, and then...")
+ * automatic level design? -- err uh
+ * better animate player death so they can see what exactly caused it?
+ * monster spawns over time? if so, how?
+ * may need to weaken the ITEM and ANI refs in the LMap?
+ * avoid repeated messages or use a xN indicator to tally repeats
+ * non-player moves will need more nuance if want animates to not trip
+   over one another, e.g. when a row of them moving towards player and
+   the first one is the last in this list
+ * may want fuses on bombs, or that they explode at end of fall
+ * maybe explicit monster freeze of monsters following rotate instead of
+   them (maybe) chasing a now very wrong target?

@@ -24,7 +24,7 @@
 # animate). there are some complications around killing things off; dead
 # things must not interact with anything, but may be looped to after
 # their dead in the apply_gravity or game_loop UPDATE calls. hence the
-# BLACK_SPOT                         
+# BLACK_SPOT                                                        
 
 package Game::PlatformsOfPeril;
 
@@ -74,8 +74,8 @@ sub MOVE_FAILED () { 0 }
 sub MOVE_OK ()     { 1 }
 
 # for the level map
-sub COLS ()               { 24 }
-sub ROWS ()               { 24 }
+sub COLS ()               { 23 }
+sub ROWS ()               { 23 }
 sub MAP_DISPLAY_OFFSET () { 1 }
 
 # level map is row, col while points are [ col, row ]
@@ -83,7 +83,7 @@ sub PROW () { 1 }
 sub PCOL () { 0 }
 
 sub MESSAGE_ROW ()      { 1 }
-sub MESSAGE_COL ()      { 26 }
+sub MESSAGE_COL ()      { 25 }
 sub MESSAGE_MAX ()      { 24 }
 sub MESSAGE_COLS_MAX () { 70 }
 
@@ -110,28 +110,10 @@ sub GRAPH_NODE ()   { 0 }
 sub GRAPH_WEIGHT () { 1 }
 sub GRAPH_POINT ()  { 2 }
 
-sub GAME_FREQUENCY () { 0.01 }    # seconds
-sub ROTATE_DELAY ()   { 0.20 }    # seconds
-sub REDRAW_DELAY ()   { 0.05 }    # seconds
-
-our ( @Graphs, $LMap, $Monst_Name, @RedrawA, @RedrawB, $Hero, $TCols, $TRows );
-
 our $AnimateID = 1;
 
-our %Animates = (
-    HERO,
-    [   HERO,                     # WHAT
-        "\e[1;33m\@\e[0m",        # DISP
-        ANI,                      # TYPE
-        [ START_GEMS, START_BOMBS ],    # STASH
-        \&update_hero,                  # UPDATE
-        HERO,                           # ANI_ID
-        undef,                          # LMC
-    ],
-);
-
 our %CharMap = (
-    '!' => BOMB,
+    'o' => BOMB,
     '.' => FLOOR,
     '*' => GEM,
     '@' => HERO,
@@ -142,10 +124,62 @@ our %CharMap = (
     '#' => WALL,
 );
 
-our $Checkpoint = [gettimeofday];
+our ( @Graphs, $LMap, $Monst_Name, @RedrawA, @RedrawB, $Hero, $TCols, $TRows );
+
+our $Level = 0;
+our $Level_Path;
+
+# plosive practice. these must pluralize properly (or please patch)
+our @Menagerie = (
+    'Palace Peacock',
+    'Peckish Packrat',
+    'Peevish Penguin',
+    'Piratical Parakeet',
+    'Placid Piranha',
+    'Pleasant Porcupine',
+    'Priggish Python',
+    'Prurient Pachyderm',
+    'Purposeful Plant',
+);
+$Monst_Name = $Menagerie[ rand @Menagerie ];
+
+our $Redraw_Delay = 0.05;
+our $Rotate_Delay = 0.20;
+our $Rotation     = 0;
+
+our @Scientists = qw(Eigen Maxwell Newton);
+our $Scientist  = $Scientists[ rand @Scientists ];
+
+our $Seed;
+
+our @Styles =
+  qw(Abstract Art-Deco Brutalist Egyptian Greek Impressionist Post-Modern Roman Romantic);
+our $Style = $Styles[ rand @Styles ];
+
+our %Things = (
+    BOMB,   [ BOMB,   "\e[31mo\e[0m",   ITEM ],
+    FLOOR,  [ FLOOR,  "\e[33m.\e[0m",   FLOOR ],
+    GEM,    [ GEM,    "\e[32m*\e[0m",   ITEM ],
+    LADDER, [ LADDER, "\e[37m=\e[0m",   LADDER ],
+    STAIR,  [ FLOOR,  "\e[37m%\e[0m",   STAIR ],
+    STATUE, [ FLOOR,  "\e[1;33m&\e[0m", STATUE ],
+    WALL,   [ WALL,   "\e[35m#\e[0m",   WALL ],
+);
+
+our %Animates = (
+    HERO,
+    [   HERO,                 # WHAT
+        "\e[1;33m\@\e[0m",    # DISP
+        ANI,                  # TYPE
+        [ START_GEMS, START_BOMBS ],    # STASH
+        \&update_hero,                  # UPDATE
+        HERO,                           # ANI_ID
+        undef,                          # LMC
+    ],
+);
 
 our %Interact_With = (
-    HERO,    # the target of the mover
+    HERO,                               # the target of the mover
     sub {
         my ( $mover, $target ) = @_;
         game_over_monster() if $mover->[WHAT] == MONST;
@@ -180,63 +214,27 @@ our %Interact_With = (
     },
 );
 
-our $Level = 0;
-our $Level_Path;
-
-# plosive practice. these must pluralize properly (or please patch)
-our @Menagerie = (
-    'Palace Peacock',
-    'Peckish Packrat',
-    'Peevish Penguin',
-    'Piratical Parakeet',
-    'Placid Piranha',
-    'Pleasant Porcupine',
-    'Priggish Python',
-    'Prurient Pachyderm',
-    'Purposeful Plant',
-);
-$Monst_Name = $Menagerie[ rand @Menagerie ];
-
-our $Rotation = 0;
-
-our @Scientists = qw(Eigen Maxwell Newton);
-our $Scientist  = $Scientists[ rand @Scientists ];
-
-our $Seed;
-
-our @Styles =
-  qw(Abstract Art-Deco Brutalist Egyptian Greek Impressionist Post-Modern Roman Romantic);
-our $Style = $Styles[ rand @Styles ];
-
-our %Things = (
-    BOMB,   [ BOMB,   "\e[31mo\e[0m",   ITEM ],
-    FLOOR,  [ FLOOR,  "\e[33m.\e[0m",   FLOOR ],
-    GEM,    [ GEM,    "\e[32m*\e[0m",   ITEM ],
-    LADDER, [ LADDER, "\e[37m=\e[0m",   LADDER ],
-    STAIR,  [ FLOOR,  "\e[37m%\e[0m",   STAIR ],
-    STATUE, [ FLOOR,  "\e[1;33m&\e[0m", STATUE ],
-    WALL,   [ WALL,   "\e[35m#\e[0m",   WALL ],
-);
-
 our %Key_Commands = (
     'h' => move_player( -1, +0 ),    # left
     'j' => move_player( +0, +1 ),    # down
     'k' => move_player( +0, -1 ),    # up
     'l' => move_player( +1, +0 ),    # right
-    '.' => sub { return MOVE_OK },   # rest
-    ' ' => sub { return MOVE_OK },   # also rest
+    '.' => \&move_nop,               # rest
+    ' ' => \&move_nop,               # also rest
     '<' => sub {
         post_message( $Scientist . q{'s magic wonder left boot, activate!} );
         rotate_left();
         print draw_level();
-        sleep(ROTATE_DELAY);
+        sleep($Rotate_Delay);
+        # NOTE rotations confuse monsters (until the player falls, or
+        # makes a non-rotation move). did not like track_player() here
         return MOVE_OK;
     },
     '>' => sub {
         post_message( $Scientist . q{'s magic wonder right boot, activate!} );
         rotate_right();
         print draw_level();
-        sleep(ROTATE_DELAY);
+        sleep($Rotate_Delay);
         return MOVE_OK;
     },
     '?' => sub {
@@ -323,31 +321,7 @@ sub apply_gravity {
             $hero_fall = 1;
         }
     }
-    # this complication tries to route monsters to where the player will
-    # fall to (or has fallen to)
-    if ($hero_fall) {
-        my $row = $Animates{ HERO, }[LMC][WHERE][PROW];
-        my $col = $Animates{ HERO, }[LMC][WHERE][PCOL];
-        if ( $row == ROWS - 1 ) {
-            $Hero = [ $col, $row ];
-            return;
-        }
-        my $goal = $row;
-        for my $r ( $row + 1 .. ROWS - 1 ) {
-            last if $LMap->[$r][$col][GROUND][WHAT] == WALL;
-            if ($LMap->[$r][$col][GROUND][WHAT] == LADDER
-                or (    $r < ROWS - 2
-                    and $LMap->[$r][$col][GROUND][WHAT] == FLOOR
-                    and $LMap->[ $r + 1 ][$col][GROUND][WHAT] == WALL )
-                or (    $r == ROWS - 1
-                    and $LMap->[$r][$col][GROUND][WHAT] == FLOOR )
-            ) {
-                $goal = $r;
-                last;
-            }
-        }
-        $Hero = [ $col, $goal ];
-    }
+    track_hero() if $hero_fall;
 }
 
 sub bad_terminal {
@@ -375,6 +349,7 @@ sub draw_level {
             }
         }
     }
+    $s .= at( 1, ROWS + 1 ) . $Things{ WALL, }[DISP] x COLS;
     return $s;
 }
 
@@ -478,7 +453,7 @@ sub game_over {
     my ( $msg, $code ) = @_;
     $code //= 1;
     ReadMode 'restore';
-    print at( 0, ROWS ), term_norm, "\n", clear_right, show_cursor, $msg, ' (',
+    print at( 1, ROWS + 1 ), term_norm, "\n", clear_right, show_cursor, $msg, ' (',
       $Animates{ HERO, }[STASH][GEM_STASH], " gems)\n",
       clear_right;
     exit $code;
@@ -719,12 +694,14 @@ sub move_animate {
     return MOVE_OK;
 }
 
+sub move_nop { return MOVE_OK }
+
 sub move_player {
     my ( $cols, $rows ) = @_;
     return sub {
         my ( $status, $msg ) = move_animate( $Animates{ HERO, }, $cols, $rows );
         post_message($msg) if $msg;
-        $Hero = $Animates{ HERO, }[LMC][WHERE];
+        track_hero();
         return $status;
     };
 }
@@ -785,7 +762,7 @@ sub redraw_level { print clear_screen, draw_level; show_messages() }
 
 sub redraw_movers {
     redraw_ref( \@RedrawA );
-    sleep(REDRAW_DELAY);
+    sleep($Redraw_Delay);
     redraw_ref( \@RedrawB );
     @RedrawA = ();
     @RedrawB = ();
@@ -843,6 +820,32 @@ sub rotate_right {
     $Rotation = ( $Rotation - 1 ) % 4;
 }
 
+sub track_hero {
+    $Hero = $Animates{ HERO, }[LMC][WHERE];
+
+    # route monsters to where the player will fall to as otherwise they
+    # tend to freeze or head in the wrong direction
+    my $row = $Animates{ HERO, }[LMC][WHERE][PROW];
+    my $col = $Animates{ HERO, }[LMC][WHERE][PCOL];
+    return if $row == ROWS - 1 or $LMap->[$row][$col][GROUND][WHAT] == LADDER;
+
+    my $goal = $row;
+    for my $r ( $row + 1 .. ROWS - 1 ) {
+        last if $LMap->[$r][$col][GROUND][WHAT] == WALL;
+        if ($LMap->[$r][$col][GROUND][WHAT] == LADDER
+            or (    $r < ROWS - 2
+                and $LMap->[$r][$col][GROUND][WHAT] == FLOOR
+                and $LMap->[ $r + 1 ][$col][GROUND][WHAT] == WALL )
+            or (    $r == ROWS - 1
+                and $LMap->[$r][$col][GROUND][WHAT] == FLOOR )
+        ) {
+            $goal = $r;
+            last;
+        }
+    }
+    $Hero = [ $col, $goal ];
+}
+
 sub update_hero {
     my $key;
     my %seen;
@@ -858,9 +861,6 @@ sub update_hero {
         post_message($msg) if defined $msg;
         last if $status == MOVE_OK;
     }
-    my $elapsed = tv_interval($Checkpoint);
-    sleep( GAME_FREQUENCY - $elapsed ) if $elapsed < GAME_FREQUENCY;
-    $Checkpoint = [gettimeofday];
 }
 
 sub update_monst {
@@ -958,8 +958,6 @@ might contain something like:
     wrterm*faceSize:24
     wrterm*foreground:gold
     wrterm*geometry:70x24
-    wrterm*saveLines:0
-    wrterm*scrollBar:false
     wrterm*termName:xterm-256color
 
 And with that loaded by X11 an C<xterm> could be launched via:
@@ -969,6 +967,8 @@ And with that loaded by X11 an C<xterm> could be launched via:
 to play the game in.
 
 =head1 BUGS
+
+Probably lots.
 
 Please report any bugs or feature requests to
 C<bug-game-platformsofperil at rt.cpan.org>, or through the web
@@ -1000,7 +1000,7 @@ Automatic level generation might be nice? Or more levels made by hand...
 
 Need to research how gems are made into bombs.
 
-The game is not very perilous.
+The game is not very perilous. And probably needs much tuning.
 
 =head1 SEE ALSO
 
