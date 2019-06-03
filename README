@@ -31,7 +31,13 @@ https://github.com/thrig/Game-PlatformsOfPeril
 
 This can be built and installed by running:
 
+    cd Game-PlatformsOfPeril
     perl Makefile.PL
     make
     make test
     make install
+
+Or to pull in the dependencies automatically and then install:
+
+    cd Game-PlatformsOfPeril
+    cpanm .

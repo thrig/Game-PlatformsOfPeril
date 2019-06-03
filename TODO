@@ -11,4 +11,5 @@
    the first one is the last in this list
  * may want fuses on bombs, or that they explode at end of fall
  * maybe explicit monster freeze of monsters following rotate instead of
-   them (maybe) chasing a now very wrong target?
+   them (maybe) chasing a now very wrong target? (or different levels of
+   difficulty and then different track_hero updates)

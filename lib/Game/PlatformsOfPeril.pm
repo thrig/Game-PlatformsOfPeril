@@ -1,9 +1,10 @@
 # -*- Perl -*-
 #
 # this is a terminal-based game, run the `pperil` command that should be
-# installed with this module to start the game
+# installed with this module to start the game (you may need to tell it
+# where to find some level maps)
 #
-# some details for the unwary, or brave, regarding the following code:
+# some details for the unwary, or brave, regarding the code:
 #
 # this implementation uses arrays heavily so instead of a more typical
 # Player object there is an array with various slots that are used for
@@ -22,13 +23,13 @@
 # level maps are ASCII text, and only one thing can be present in a cell
 # in the map (with FLOOR being assumed present below any item or
 # animate). there are some complications around killing things off; dead
-# things must not interact with anything, but may be looped to after
-# their dead in the apply_gravity or game_loop UPDATE calls. hence the
-# BLACK_SPOT                                                        
+# things must not interact with anything, but may still be looped to
+# after their death in the apply_gravity or game_loop UPDATE calls.
+# hence the BLACK_SPOT
 
 package Game::PlatformsOfPeril;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 use 5.24.0;
 use warnings;
@@ -82,8 +83,9 @@ sub MAP_DISPLAY_OFFSET () { 1 }
 sub PROW () { 1 }
 sub PCOL () { 0 }
 
-sub MESSAGE_ROW ()      { 1 }
-sub MESSAGE_COL ()      { 25 }
+sub MESSAGE_ROW () { 1 }
+sub MESSAGE_COL () { 25 }
+# these also used to determine the minimum size for the terminal
 sub MESSAGE_MAX ()      { 24 }
 sub MESSAGE_COLS_MAX () { 70 }
 
@@ -124,7 +126,10 @@ our %CharMap = (
     '#' => WALL,
 );
 
-our ( @Graphs, $LMap, $Monst_Name, @RedrawA, @RedrawB, $Hero, $TCols, $TRows );
+our (
+    @Death_Row, @Graphs, $LMap,  $Monst_Name, @RedrawA,
+    @RedrawB,   $Hero,   $TCols, $TRows
+);
 
 our $Level = 0;
 our $Level_Path;
@@ -304,6 +309,7 @@ our %Key_Commands = (
 sub apply_gravity {
     my $hero_fall = 0;
     for my $ent ( rev_nsort_by { $_->[LMC][WHERE][PROW] } values %Animates ) {
+        next if $ent->[BLACK_SPOT];
         my $here = $ent->[LMC][WHERE];
         next
           if $here->[PROW] == ROWS - 1
@@ -326,7 +332,11 @@ sub apply_gravity {
 
 sub bad_terminal {
     ( $TCols, $TRows ) = (GetTerminalSize)[ 0, 1 ];
-    return ( not defined $TCols or $TCols < MESSAGE_COLS_MAX or $TRows < ROWS );
+    return (
+             not defined $TCols
+          or $TCols < MESSAGE_COLS_MAX
+          or $TRows < MESSAGE_MAX
+    );
 }
 
 sub bail_out {
@@ -356,12 +366,9 @@ sub draw_level {
 sub explode {
     post_message('ka-boom!');
     for my $ent (@_) {
-        if ( $ent->[LMC][GROUND][TYPE] == STATUE ) {
-            $ent->[LMC][GROUND] = $Things{ FLOOR, };
-        }
-        push @RedrawA, $ent->[LMC][WHERE];
-        $ent->[BLACK_SPOT] = 1;
-        undef $ent->[LMC][ $ent->[TYPE] ];
+        # HEROIC DESTRUCTION
+        $ent->[LMC][GROUND] = $Things{ FLOOR, } if $ent->[LMC][GROUND][TYPE] == STATUE;
+        kill_animate( $ent );
     }
 }
 
@@ -434,17 +441,14 @@ sub game_loop {
     };
 
     while (1) {
-        my @Death_Row;
         apply_gravity();
+        while ( my $id = pop @Death_Row ) { delete $Animates{$id} }
         redraw_movers() if @RedrawA;
         for my $ent ( nsort_by { $_->[ANI_ID] } values %Animates ) {
-            if ( $ent->[BLACK_SPOT] ) {
-                push @Death_Row, $ent;
-                next;
-            }
+            next if $ent->[BLACK_SPOT];
             $ent->[UPDATE]->($ent) if defined $ent->[UPDATE];
         }
-        for my $ent (@Death_Row) { delete $Animates{ $ent->[ANI_ID] } }
+        while ( my $id = pop @Death_Row ) { delete $Animates{$id} }
         redraw_movers();
     }
 }
@@ -470,9 +474,7 @@ sub game_over_monster {
 sub grab_gem {
     my ( $ent, $gem ) = @_;
     $ent->[STASH][GEM_STASH] += $gem->[STASH];
-    push @RedrawA, $gem->[LMC][WHERE];
-    $gem->[BLACK_SPOT] = 1;
-    undef $gem->[LMC][ITEM];
+    kill_animate( $gem );
     if ( $ent->[WHAT] == MONST ) {
         post_message( 'The ' . $Monst_Name . ' grabs a gem.' );
     } else {
@@ -593,6 +595,17 @@ sub interact {
         }
     }
     return 0;
+}
+
+sub kill_animate {
+    my ($ent) = @_;
+    push @RedrawA, $ent->[LMC][WHERE];
+    $ent->[BLACK_SPOT] = 1;
+    push @Death_Row, $ent->[ANI_ID];
+    # NOTE this only works for TYPE of ANI or ITEM, may need to rethink
+    # how STATUE and STAIRS are handled if there are GROUND checks on
+    # TYPE as those abuse the TYPE field for other things (see %Things)
+    undef $ent->[LMC][ $ent->[TYPE] ];
 }
 
 sub load_level {
