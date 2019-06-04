@@ -231,11 +231,6 @@ our %Key_Commands = (
         rotate_left();
         print draw_level();
         sleep($Rotate_Delay);
-        # NOTE rotations confuse monsters (until the player falls, or
-        # makes a non-rotation move) which some might consider a bug,
-        # and others wacky good fun as the monsters run off to who
-        # knows where. I did not like track_hero() here; a "hard mode"
-        # might set it?
         return MOVE_OK;
     },
     '>' => sub {
@@ -243,7 +238,6 @@ our %Key_Commands = (
         rotate_right();
         print draw_level();
         sleep($Rotate_Delay);
-        # see NOTE above
         return MOVE_OK;
     },
     '?' => sub {
@@ -335,7 +329,6 @@ sub apply_gravity {
             } else {
                 post_message('You fall!');
             }
-            track_hero();
         }
     }
 }
@@ -459,9 +452,9 @@ sub game_loop {
         redraw_movers() if @RedrawA;
         my @actors = nsort_by { $_->[ANI_ID] } values %Animates;
         next if shift(@actors)->[UPDATE]->() == MOVE_NEWLVL;
+        track_hero();
         for my $ent (@actors) {
-            next if $ent->[BLACK_SPOT];
-            $ent->[UPDATE]->($ent) if defined $ent->[UPDATE];
+            $ent->[UPDATE]->($ent) if !$ent->[BLACK_SPOT] and defined $ent->[UPDATE];
         }
         while ( my $id = pop @Death_Row ) { delete $Animates{$id} }
         redraw_movers();
@@ -720,14 +713,13 @@ sub move_animate {
     return MOVE_OK;
 }
 
-sub move_nop { track_hero(); return MOVE_OK }
+sub move_nop { return MOVE_OK }
 
 sub move_player {
     my ( $cols, $rows ) = @_;
     return sub {
         my ( $status, $msg ) = move_animate( $Animates{ HERO, }, $cols, $rows );
         post_message($msg) if $msg;
-        track_hero();
         return $status;
     };
 }
