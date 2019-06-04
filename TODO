@@ -1,6 +1,5 @@
- * figure out a way to install level maps somewhere sensible at that the
-   module can find on install (or additional instructions on "get a
-   directory of level maps, and then...")
+ * maybe if monsters have no route they switch to trying to get as close
+   as possible to player? (or collect nearest gem?)
  * automatic level design? -- err uh
  * better animate player death so they can see what exactly caused it?
  * monster spawns over time? if so, how?
@@ -10,6 +9,3 @@
    over one another, e.g. when a row of them moving towards player and
    the first one is the last in this list
  * may want fuses on bombs, or that they explode at end of fall
- * maybe explicit monster freeze of monsters following rotate instead of
-   them (maybe) chasing a now very wrong target? (or different levels of
-   difficulty and then different track_hero updates)

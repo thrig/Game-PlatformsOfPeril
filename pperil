@@ -4,6 +4,7 @@
 
 use 5.24.0;
 use warnings;
+use File::ShareDir qw(dist_dir);
 
 our ( $ddelay, $err, $level, $prefix, $rdelay, $seed );
 
@@ -43,7 +44,7 @@ TLDR
     ) or exit 1;
 
     $level  //= 0;
-    $prefix //= 'levels';
+    $prefix //= dist_dir('Game-PlatformsOfPeril');
     $seed   //= srand;
 }
 

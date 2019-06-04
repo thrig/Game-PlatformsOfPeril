@@ -1,8 +1,7 @@
 # -*- Perl -*-
 #
 # this is a terminal-based game, run the `pperil` command that should be
-# installed with this module to start the game (you may need to tell it
-# where to find some level maps)
+# installed with this module to start the game
 #
 # some details for the unwary, or brave, regarding the code:
 #
@@ -73,6 +72,7 @@ sub ANI ()    { 3 }
 
 sub MOVE_FAILED () { 0 }
 sub MOVE_OK ()     { 1 }
+sub MOVE_NEWLVL () { 2 }
 
 # for the level map
 sub COLS ()               { 23 }
@@ -232,7 +232,10 @@ our %Key_Commands = (
         print draw_level();
         sleep($Rotate_Delay);
         # NOTE rotations confuse monsters (until the player falls, or
-        # makes a non-rotation move). did not like track_player() here
+        # makes a non-rotation move) which some might consider a bug,
+        # and others wacky good fun as the monsters run off to who
+        # knows where. I did not like track_hero() here; a "hard mode"
+        # might set it?
         return MOVE_OK;
     },
     '>' => sub {
@@ -240,12 +243,16 @@ our %Key_Commands = (
         rotate_right();
         print draw_level();
         sleep($Rotate_Delay);
+        # see NOTE above
         return MOVE_OK;
     },
     '?' => sub {
         post_help();
         return MOVE_FAILED;
     },
+    # for debugging, probably shouldn't be included as it shows exactly
+    # where the monsters are trying to move to which may or may not be
+    # where the player is
     'T' => sub {
         local $" = ',';
         post_message("T $Hero->@* R $Rotation");
@@ -264,12 +271,17 @@ our %Key_Commands = (
               . ' gems.' );
         return MOVE_FAILED;
     },
+    # by way of history '%' is what rogue (version 3.6) uses for stairs,
+    # except the '>' (or very rarely '<') keys are used to interact with
+    # that symbol
     '%' => sub {
         if ( $Animates{ HERO, }[LMC][GROUND][TYPE] == STAIR ) {
             load_level();
-            return MOVE_OK;
+            print clear_screen(), draw_level();
+            post_message( 'Level ' . $Level );
+            return MOVE_NEWLVL;
         } else {
-            post_message('There are no stairs here.');
+            post_message('There are no stairs here?');
             return MOVE_FAILED;
         }
     },
@@ -307,7 +319,6 @@ our %Key_Commands = (
 );
 
 sub apply_gravity {
-    my $hero_fall = 0;
     for my $ent ( rev_nsort_by { $_->[LMC][WHERE][PROW] } values %Animates ) {
         next if $ent->[BLACK_SPOT];
         my $here = $ent->[LMC][WHERE];
@@ -324,10 +335,9 @@ sub apply_gravity {
             } else {
                 post_message('You fall!');
             }
-            $hero_fall = 1;
+            track_hero();
         }
     }
-    track_hero() if $hero_fall;
 }
 
 sub bad_terminal {
@@ -368,10 +378,11 @@ sub explode {
     for my $ent (@_) {
         # HEROIC DESTRUCTION
         $ent->[LMC][GROUND] = $Things{ FLOOR, } if $ent->[LMC][GROUND][TYPE] == STATUE;
-        kill_animate( $ent );
+        kill_animate($ent);
     }
 }
 
+# cribbed from some A* article on https://www.redblobgames.com/
 sub find_hero {
     my ( $ent, $mcol, $mrow ) = @_;
 
@@ -421,7 +432,7 @@ sub find_hero {
 }
 
 sub game_loop {
-    game_over( 'Terminal must be at least ' . MESSAGE_COLS_MAX . 'x' . ROWS )
+    game_over( 'Terminal must be at least ' . MESSAGE_COLS_MAX . 'x' . MESSAGE_MAX )
       if bad_terminal();
     ( $Level_Path, $Level, $Seed ) = @_;
     $SIG{$_} = \&bail_out for qw(INT HUP TERM PIPE QUIT USR1 USR2 __DIE__);
@@ -431,6 +442,8 @@ sub game_loop {
     print term_norm, hide_cursor, hide_pointer, clear_screen, draw_level;
     post_message('The Platforms of Peril');
     post_message('');
+    post_message( 'Your constant foes, the ' . $Monst_Name . 's' );
+    post_message('seek to destroy your way of life!');
     post_help();
     post_message('');
     post_message( 'Seed ' . $Seed );
@@ -444,7 +457,9 @@ sub game_loop {
         apply_gravity();
         while ( my $id = pop @Death_Row ) { delete $Animates{$id} }
         redraw_movers() if @RedrawA;
-        for my $ent ( nsort_by { $_->[ANI_ID] } values %Animates ) {
+        my @actors = nsort_by { $_->[ANI_ID] } values %Animates;
+        next if shift(@actors)->[UPDATE]->() == MOVE_NEWLVL;
+        for my $ent (@actors) {
             next if $ent->[BLACK_SPOT];
             $ent->[UPDATE]->($ent) if defined $ent->[UPDATE];
         }
@@ -463,9 +478,7 @@ sub game_over {
     exit $code;
 }
 
-sub game_over_bomb {
-    game_over('You gone done blowed yourself up.');
-}
+sub game_over_bomb { game_over('You gone done blowed yourself up.') }
 
 sub game_over_monster {
     game_over( 'The ' . $Monst_Name . ' polished you off.' );
@@ -474,7 +487,7 @@ sub game_over_monster {
 sub grab_gem {
     my ( $ent, $gem ) = @_;
     $ent->[STASH][GEM_STASH] += $gem->[STASH];
-    kill_animate( $gem );
+    kill_animate($gem);
     if ( $ent->[WHAT] == MONST ) {
         post_message( 'The ' . $Monst_Name . ' grabs a gem.' );
     } else {
@@ -707,7 +720,7 @@ sub move_animate {
     return MOVE_OK;
 }
 
-sub move_nop { return MOVE_OK }
+sub move_nop { track_hero(); return MOVE_OK }
 
 sub move_player {
     my ( $cols, $rows ) = @_;
@@ -720,8 +733,6 @@ sub move_player {
 }
 
 sub post_help {
-    post_message( 'Your constant foes, the ' . $Monst_Name . 's' );
-    post_message('seek to destroy your way of life!');
     post_message('');
     post_message(
         ' ' . $Animates{ HERO, }[DISP] . ' - You   P - a ' . $Monst_Name );
@@ -860,8 +871,7 @@ sub track_hero {
 }
 
 sub update_hero {
-    my $key;
-    my %seen;
+    my ( $key, $ret, %seen );
     tcflush( STDIN_FILENO, TCIFLUSH );
     while (1) {
         while (1) {
@@ -870,10 +880,11 @@ sub update_hero {
             last if exists $Key_Commands{$key};
             post_message( sprintf "Illegal command \\%03o", ord $key );
         }
-        my ( $status, $msg ) = $Key_Commands{$key}->();
+        ( $ret, my $msg ) = $Key_Commands{$key}->();
         post_message($msg) if defined $msg;
-        last if $status == MOVE_OK;
+        last if $ret == MOVE_OK or $ret == MOVE_NEWLVL;
     }
+    return $ret;
 }
 
 sub update_monst {
@@ -881,7 +892,13 @@ sub update_monst {
     my $mcol  = $ent->[LMC][WHERE][PCOL];
     my $mrow  = $ent->[LMC][WHERE][PROW];
 
-    # prevent monster downward move where only gravity should apply
+    # prevent monster move where only gravity should apply
+    # NOTE one may have the clever idea that monsters can run across the
+    # heads of other monsters though that would require changes to how
+    # the graph is setup to permit such moves, and additional checks to
+    # see if something to tread upon is available (and then to let the
+    # hero do that (like in Lode Runner) or to prevent them from such
+    # head-running...)
     if (    $mrow != ROWS - 1
         and $ent->[LMC][GROUND][WHAT] == FLOOR
         and $LMap->[ $mrow + 1 ][$mcol][GROUND][WHAT] != WALL ) {
@@ -921,6 +938,9 @@ black background) install and run the game via:
 
     cpanm Game::PlatformsOfPeril
     pperil
+
+Help text should be printed when the game starts. Use the C<?> key in
+game to show the help text again.
 
 =head1 DESCRIPTION
 
@@ -1005,9 +1025,10 @@ C<$LMap> (which needs to know things about the animates). In other
 words, this game may leak memory.
 
 Some may be desirous of non-hjkl movement keys and so forth. Fiddle with
-the code, or abstract things to use MOVE_LEFT etc and then map keys to
-those symbols. At that point one might add a configuration file or
-in-game editor of the key commands, but that sounds like work.
+the code (C<our> variables can be clobbered from outside the module), or
+abstract things to use MOVE_LEFT etc and then map keys to those symbols.
+At that point one might add a configuration file or in-game editor of
+the key commands, but that sounds like work.
 
 Automatic level generation might be nice? Or more levels made by hand...
 
@@ -1022,6 +1043,21 @@ bombs are from Bomberman but behave more like animate-sensing landmines.
 One idea is that a gem plus a bomb could make a smartbomb which, being
 smart, tracks the player. However bombs lack limbs so have trouble with
 the ladders, and that idea is otherwise presently tied up in committee.
+
+L<Game::TextPatterns> may help draw candidate level maps:
+
+    use Game::TextPatterns;
+
+    my $pat = Game::TextPatterns->new( pattern => <<'EOP' );
+    .==P..
+    o#===.
+    ####=.
+    =====.
+    .=*#..
+    .=###.
+    EOP
+
+    print $pat->four_up->flip_four(1)->string;
 
 =head1 AUTHOR
 

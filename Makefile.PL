@@ -1,9 +1,11 @@
 #!perl
 
-use 5.024;
-use strict;
+use 5.24.0;
 use warnings;
 use ExtUtils::MakeMaker;
+use File::ShareDir::Install qw(install_share);
+
+install_share 'levels';
 
 sub merge_key_into {
     my ( $href, $target, $source ) = @_;
@@ -24,8 +26,9 @@ my %params = (
     PL_FILES => {},
 
     CONFIGURE_REQUIRES => {
-        'ExtUtils::MakeMaker' => '6.48',
-        'strict'              => 0,
+        'ExtUtils::MakeMaker'     => '6.48',
+        'File::ShareDir::Install' => 0,
+        'strict'                  => 0,
     },
     BUILD_REQUIRES => {},
     TEST_REQUIRES  => {
@@ -33,6 +36,7 @@ my %params = (
         'lib'        => 0,
     },
     PREREQ_PM => {
+        'File::ShareDir'      => 0,
         'File::Spec'          => 0,
         'List::PriorityQueue' => 0,
         'List::Util'          => 0,
@@ -45,7 +49,8 @@ my %params = (
     },
 
     META_MERGE => {
-        'resources' => { repository => 'https://github.com/thrig/Game-PlatformsOfPeril', },
+        'resources' =>
+          { repository => 'https://github.com/thrig/Game-PlatformsOfPeril', },
     },
 );
 
@@ -72,3 +77,6 @@ if ( $mm_version < 6.51_03 ) {
 }
 
 WriteMakefile( ( MM->can('signature_target') ? ( SIGN => 1 ) : () ), %params );
+
+package MY;
+use File::ShareDir::Install qw(postamble);
