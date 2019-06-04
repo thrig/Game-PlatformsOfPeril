@@ -28,7 +28,7 @@
 
 package Game::PlatformsOfPeril;
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 use 5.24.0;
 use warnings;
@@ -226,6 +226,7 @@ our %Key_Commands = (
     'l' => move_player( +1, +0 ),    # right
     '.' => \&move_nop,               # rest
     ' ' => \&move_nop,               # also rest
+    'x' => \&move_examine,
     '<' => sub {
         post_message( $Scientist . q{'s magic wonder left boot, activate!} );
         rotate_left();
@@ -272,7 +273,12 @@ our %Key_Commands = (
         if ( $Animates{ HERO, }[LMC][GROUND][TYPE] == STAIR ) {
             load_level();
             print clear_screen(), draw_level();
-            post_message( 'Level ' . $Level );
+            post_message( 'Level '
+                  . $Level . ' (You have '
+                  . $Animates{ HERO, }[STASH][BOMB_STASH]
+                  . ' bombs and '
+                  . $Animates{ HERO, }[STASH][GEM_STASH]
+                  . ' gems.)' );
             return MOVE_NEWLVL;
         } else {
             post_message('There are no stairs here?');
@@ -308,6 +314,10 @@ our %Key_Commands = (
     },
     "\032" => sub {                                    # <C-z>
         post_message('You hear a strange noise in the background.');
+        return MOVE_FAILED;
+    },
+    "\033" => sub {
+        post_message('You cannot escape so easily.');
         return MOVE_FAILED;
     },
 );
@@ -351,7 +361,7 @@ sub bail_out {
 sub draw_level {
     my $s = '';
     for my $rownum ( 0 .. ROWS - 1 ) {
-        $s .= at MAP_DISPLAY_OFFSET, MAP_DISPLAY_OFFSET + $rownum;
+        $s .= at( MAP_DISPLAY_OFFSET, MAP_DISPLAY_OFFSET + $rownum );
         for my $lmc ( $LMap->[$rownum]->@* ) {
             if ( defined $lmc->[ANI] ) {
                 $s .= $lmc->[ANI][DISP];
@@ -713,6 +723,24 @@ sub move_animate {
     return MOVE_OK;
 }
 
+sub move_examine {
+    my $row = $Animates{ HERO, }[LMC][WHERE][PROW];
+    my $col = $Animates{ HERO, }[LMC][WHERE][PCOL];
+    print at( $col, $row ), show_cursor;
+    post_message( 'Move cursor to view a cell. Esc exits.' );
+    my $key;
+    while (1) {
+        $key = ReadKey(0);
+        last if $key eq "\033";
+        # xxx maybe a Examine_Commands and then full motion, limit
+        # to level map area, etc. perhaps . or ? to show what is
+        # in the cell to avoid message spam, or overwrite some
+        # area of the log and then restore that when done?
+    }
+    print hide_cursor;
+    return MOVE_FAILED;
+}
+
 sub move_nop { return MOVE_OK }
 
 sub move_player {
@@ -863,12 +891,11 @@ sub track_hero {
 }
 
 sub update_hero {
-    my ( $key, $ret, %seen );
+    my ( $key, $ret );
     tcflush( STDIN_FILENO, TCIFLUSH );
     while (1) {
         while (1) {
             $key = ReadKey(0);
-            next if $seen{$key}++;
             last if exists $Key_Commands{$key};
             post_message( sprintf "Illegal command \\%03o", ord $key );
         }
