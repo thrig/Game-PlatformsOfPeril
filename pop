@@ -1,5 +1,5 @@
 #!/usr/bin/env perl
-# pop - for test and debug from module directory
+# ./pop - for test and debug directly from the module directory
 use 5.24.0;
 use warnings;
 BEGIN { srand 42 }
@@ -11,4 +11,6 @@ unless ( open STDERR, '>', 'log' ) {
     exit 1;
 }
 STDERR->autoflush(1);
-Game::PlatformsOfPeril::game_loop( 'levels', shift // 0, 42 );
+my $level = shift // 0;
+my $path  = shift // 'levels';
+Game::PlatformsOfPeril::game_loop( $path, $level, 42 );
