@@ -375,7 +375,7 @@ sub apply_gravity {
 }
 
 sub bad_terminal {
-    ( $TCols, $TRows ) = (GetTerminalSize)[ 0, 1 ];
+    ( $TCols, $TRows ) = (GetTerminalSize *STDOUT)[ 0, 1 ];
     return ( not defined $TCols or $TCols < MSG_COLS_MAX or $TRows < MSG_MAX );
 }
 
