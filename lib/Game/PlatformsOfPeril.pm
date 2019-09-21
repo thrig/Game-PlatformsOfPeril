@@ -403,6 +403,14 @@ sub draw_level {
 }
 
 sub explode {
+    my ($mover, $target) = @_;
+    my $pos    = $target->[LMC][WHERE];
+    my @colors = ("\e[31m", "\e[33m");
+    for (1 .. 4) {
+        print at(map { MAP_DISP_OFF + $_ } $pos->@*), $colors[ rand @colors ], '*',
+          term_norm;
+        sleep($Redraw_Delay);
+    }
     post_message('ka-boom!');
     for my $ent (@_) {
         # HEROIC DESTRUCTION
