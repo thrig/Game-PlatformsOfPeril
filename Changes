@@ -1,5 +1,8 @@
 Revision history for Game::PlatformsOfPeril
 
+0.05    2019-09-21
+        Some internals fiddling. Animate explosions.
+
 0.04    2019-08-17
         Altscreen support, more portable GetTerminalSize call.
 

@@ -9,7 +9,7 @@
 # Player object there is an array with various slots that are used for
 # various purposes. these slots are indexed using constant subs, and
 # there is some overlap of these slots for animates, items, and terrain.
-# the %Animates hash (where the player, monsters, and items reside) and
+# the @Animates array (where the player, monsters, and items reside) and
 # $LMap (level map, which has every ROW and COL and then an array (LMC)
 # for what is in that cell) is where most of the game data resides.
 # there can be only one terrain (GROUND), one ITEM, and one animate
@@ -28,7 +28,9 @@
 
 package Game::PlatformsOfPeril;
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
+
+use Carp::Always;
 
 use 5.24.0;
 use warnings;
@@ -101,9 +103,8 @@ sub DISP () { 1 }
 sub TYPE ()       { 2 }
 sub STASH ()      { 3 }
 sub UPDATE ()     { 4 }
-sub ANI_ID ()     { 5 }
-sub LMC ()        { 6 }
-sub BLACK_SPOT () { 7 }
+sub LMC ()        { 5 }
+sub BLACK_SPOT () { 6 }
 
 sub GEM_STASH ()  { 0 }
 sub BOMB_STASH () { 1 }
@@ -118,8 +119,6 @@ sub GRAPH_NODE ()   { 0 }
 sub GRAPH_WEIGHT () { 1 }
 sub GRAPH_POINT ()  { 2 }
 
-our $AnimateID = 1;
-
 our %CharMap = (
     'o' => BOMB,
     '.' => FLOOR,
@@ -133,8 +132,8 @@ our %CharMap = (
 );
 
 our (
-    @Death_Row, @Graphs, $LMap,  $Monst_Name, @RedrawA,
-    @RedrawB,   $Hero,   $TCols, $TRows
+    @Animates, @Graphs, $LMap,  $Monst_Name, @RedrawA,
+    @RedrawB,  $Hero,   $TCols, $TRows
 );
 
 our %Examine_Offsets = (
@@ -200,20 +199,11 @@ our %Descriptions = (
     WALL,   'A wall.',
 );
 
-our %Animates = (
-    HERO,
-    [   HERO,                 # WHAT
-        "\e[1;33m\@\e[0m",    # DISP
-        ANI,                  # TYPE
-        [ START_GEMS, START_BOMBS ],    # STASH
-        \&update_hero,                  # UPDATE
-        HERO,                           # ANI_ID
-        undef,                          # LMC
-    ],
-);
+$Animates[HERO]->@[ WHAT, DISP, TYPE, STASH, UPDATE ] =
+  ( HERO, "\e[1;33m\@\e[0m", ANI, [ START_GEMS, START_BOMBS ], \&update_hero );
 
 our %Interact_With = (
-    HERO,                               # the target of the mover
+    HERO,    # the target of the mover
     sub {
         my ( $mover, $target ) = @_;
         game_over_monster() if $mover->[WHAT] == MONST;
@@ -285,14 +275,14 @@ our %Key_Commands = (
     },
     '@' => sub {
         local $" = ',';
-        post_message("\@ $Animates{HERO,}[LMC][WHERE]->@* R $Rotation");
+        post_message("\@ $Animates[HERO][LMC][WHERE]->@* R $Rotation");
         return MOVE_FAILED;
     },
     '$' => sub {
         post_message( 'You have '
-              . $Animates{ HERO, }[STASH][BOMB_STASH]
+              . $Animates[HERO][STASH][BOMB_STASH]
               . ' bombs and '
-              . $Animates{ HERO, }[STASH][GEM_STASH]
+              . $Animates[HERO][STASH][GEM_STASH]
               . ' gems.' );
         return MOVE_FAILED;
     },
@@ -300,15 +290,15 @@ our %Key_Commands = (
     # except the '>' (or very rarely '<') keys are used to interact with
     # that symbol
     '%' => sub {
-        if ( $Animates{ HERO, }[LMC][GROUND][TYPE] == STAIR ) {
+        if ( $Animates[HERO][LMC][GROUND][TYPE] == STAIR ) {
             load_level();
             print clear_screen(), draw_level();
             post_message( 'Level '
                   . $Level
                   . ' (You have '
-                  . $Animates{ HERO, }[STASH][BOMB_STASH]
+                  . $Animates[HERO][STASH][BOMB_STASH]
                   . ' bombs and '
-                  . $Animates{ HERO, }[STASH][GEM_STASH]
+                  . $Animates[HERO][STASH][GEM_STASH]
                   . ' gems.)' );
             return MOVE_NEWLVL;
         } else {
@@ -317,21 +307,21 @@ our %Key_Commands = (
         }
     },
     'B' => sub {
-        my $lmc = $Animates{ HERO, }[LMC];
+        my $lmc = $Animates[HERO][LMC];
         return MOVE_FAILED, 'You have no bombs (make them from gems).'
-          if $Animates{ HERO, }[STASH][BOMB_STASH] < 1;
+          if $Animates[HERO][STASH][BOMB_STASH] < 1;
         return MOVE_FAILED, 'There is already an item in this cell.'
           if defined $lmc->[ITEM];
-        $Animates{ HERO, }[STASH][BOMB_STASH]--;
+        $Animates[HERO][STASH][BOMB_STASH]--;
         make_item( $lmc->[WHERE], BOMB, 0 );
         return MOVE_OK;
     },
     'M' => sub {
         return MOVE_FAILED, 'You need more gems.'
-          if $Animates{ HERO, }[STASH][GEM_STASH] < BOMB_COST;
-        $Animates{ HERO, }[STASH][GEM_STASH] -= BOMB_COST;
+          if $Animates[HERO][STASH][GEM_STASH] < BOMB_COST;
+        $Animates[HERO][STASH][GEM_STASH] -= BOMB_COST;
         post_message(
-            'You now have ' . ++$Animates{ HERO, }[STASH][BOMB_STASH] . ' bombs' );
+            'You now have ' . ++$Animates[HERO][STASH][BOMB_STASH] . ' bombs' );
         return MOVE_OK;
     },
     'q'    => sub { game_over('Be seeing you...') },
@@ -354,7 +344,7 @@ our %Key_Commands = (
 );
 
 sub apply_gravity {
-    for my $ent ( rev_nsort_by { $_->[LMC][WHERE][PROW] } values %Animates ) {
+    for my $ent ( rev_nsort_by { $_->[LMC][WHERE][PROW] } @Animates ) {
         next if $ent->[BLACK_SPOT];
         my $here = $ent->[LMC][WHERE];
         next
@@ -375,7 +365,7 @@ sub apply_gravity {
 }
 
 sub bad_terminal {
-    ( $TCols, $TRows ) = (GetTerminalSize *STDOUT)[ 0, 1 ];
+    ( $TCols, $TRows ) = ( GetTerminalSize * STDOUT )[ 0, 1 ];
     return ( not defined $TCols or $TCols < MSG_COLS_MAX or $TRows < MSG_MAX );
 }
 
@@ -496,15 +486,14 @@ sub game_loop {
 
     while (1) {
         apply_gravity();
-        while ( my $id = pop @Death_Row ) { delete $Animates{$id} }
+        @Animates = grep { !$_->[BLACK_SPOT] } @Animates;
         redraw_movers() if @RedrawA;
-        my @actors = nsort_by { $_->[ANI_ID] } values %Animates;
-        next if shift(@actors)->[UPDATE]->() == MOVE_NEWLVL;
+        next if $Animates[HERO][UPDATE]->() == MOVE_NEWLVL;
         track_hero();
-        for my $ent (@actors) {
+        for my $ent ( @Animates[ 1 .. $#Animates ] ) {
             $ent->[UPDATE]->($ent) if !$ent->[BLACK_SPOT] and defined $ent->[UPDATE];
         }
-        while ( my $id = pop @Death_Row ) { delete $Animates{$id} }
+        @Animates = grep { !$_->[BLACK_SPOT] } @Animates;
         redraw_movers();
     }
 }
@@ -513,7 +502,7 @@ sub game_over {
     my ( $msg, $code ) = @_;
     $code //= 1;
     restore_term();
-    print clear_right, $msg, ' (', $Animates{ HERO, }[STASH][GEM_STASH],
+    print clear_right, $msg, ' (', $Animates[HERO][STASH][GEM_STASH],
       " gems)\n", clear_right;
     exit $code;
 }
@@ -654,7 +643,6 @@ sub kill_animate {
     my ($ent) = @_;
     push @RedrawA, $ent->[LMC][WHERE];
     $ent->[BLACK_SPOT] = 1;
-    push @Death_Row, $ent->[ANI_ID];
     # NOTE this only works for TYPE of ANI or ITEM, may need to rethink
     # how STATUE and STAIRS are handled if there are GROUND checks on
     # TYPE as those abuse the TYPE field for other things (see %Things)
@@ -667,11 +655,8 @@ sub load_level {
 
     open( my $fh, '<', $file ) or game_over("Failed to open '$file': $!");
 
-    $AnimateID = 1;
-    for my $key ( grep { $_ != HERO } keys %Animates ) {
-        delete $Animates{$key};
-    }
-    undef $Animates{ HERO, }[LMC];
+    splice @Animates, 1;
+    undef $Animates[HERO][LMC];
     $LMap = [];
 
     my $rownum = 0;
@@ -695,12 +680,12 @@ sub load_level {
             } else {
                 if ( $c eq HERO ) {
                     game_over("Player placed twice in $file")
-                      if defined $Animates{ HERO, }[LMC];
+                      if defined $Animates[HERO][LMC];
                     push $LMap->[$rownum]->@*,
-                      [ $point, $Things{ FLOOR, }, undef, $Animates{ HERO, } ];
-                    $Animates{ HERO, }[LMC] = $LMap->[$rownum][-1];
+                      [ $point, $Things{ FLOOR, }, undef, $Animates[HERO] ];
+                    $Animates[HERO][LMC] = $LMap->[$rownum][-1];
                     $Hero = $point;
-                    weaken( $Animates{ HERO, }[LMC] );
+                    weaken( $Animates[HERO][LMC] );
                 } elsif ( $c eq MONST ) {
                     push $LMap->[$rownum]->@*, [ $point, $Things{ FLOOR, } ];
                     make_monster($point);
@@ -712,7 +697,7 @@ sub load_level {
         last if ++$rownum == ROWS;
     }
     game_over("Too few rows in $file") if $rownum < ROWS;
-    game_over("No player in $file") unless defined $Animates{ HERO, }[LMC];
+    game_over("No player in $file") unless defined $Animates[HERO][LMC];
 
     $Rotation = 0;
     for my $rot ( 1 .. 4 ) {
@@ -723,24 +708,28 @@ sub load_level {
 
 sub make_item {
     my ( $point, $thingy, $stash, $update ) = @_;
-    my $id   = $AnimateID++;
-    my $item = [ $Things{$thingy}->@*, $stash, $update, $id ];
-    $Animates{$id} = $item;
+    my $item;
+    $item->@[ WHAT, DISP, TYPE, STASH, UPDATE, LMC ] = (
+        $Things{$thingy}->@*,
+        $stash, $update, $LMap->[ $point->[PROW] ][ $point->[PCOL] ]
+    );
+    push @Animates, $item;
     $LMap->[ $point->[PROW] ][ $point->[PCOL] ][ITEM] = $item;
-    $Animates{$id}[LMC] = $LMap->[ $point->[PROW] ][ $point->[PCOL] ];
-    weaken( $Animates{$id}[LMC] );
+    weaken( $item->[LMC] );
 }
 
 sub make_monster {
     my ($point) = @_;
-    my $id = $AnimateID++;
+    my $monst;
     # STASH replicates that of the HERO for simpler GEM handling code
     # though the BOMB_STASH is instead used for GEM_ODDS
-    my $monst = [ MONST, "\e[1;33mP\e[0m", ANI, [ 0, 0.0 ], \&update_monst, $id ];
-    $Animates{$id} = $monst;
+    $monst->@[ WHAT, DISP, TYPE, STASH, UPDATE, LMC ] = (
+        MONST, "\e[1;33mP\e[0m", ANI, [ 0, 0.0 ],
+        \&update_monst, $LMap->[ $point->[PROW] ][ $point->[PCOL] ]
+    );
+    push @Animates, $monst;
     $LMap->[ $point->[PROW] ][ $point->[PCOL] ][ANI] = $monst;
-    $Animates{$id}[LMC] = $LMap->[ $point->[PROW] ][ $point->[PCOL] ];
-    weaken( $Animates{$id}[LMC] );
+    weaken( $monst->[LMC] );
 }
 
 sub move_animate {
@@ -764,8 +753,8 @@ sub move_animate {
 # important consideration on some levels
 sub move_examine {
     my $key;
-    my $row = $Animates{ HERO, }[LMC][WHERE][PROW];
-    my $col = $Animates{ HERO, }[LMC][WHERE][PCOL];
+    my $row = $Animates[HERO][LMC][WHERE][PROW];
+    my $col = $Animates[HERO][LMC][WHERE][PCOL];
     print at( MSG_COL, MSG_ROW + $_ ), clear_right for 1 .. MSG_MAX;
     print at( MSG_COL, MSG_ROW ), clear_right,
       'Move cursor to view a cell. Esc exits', show_cursor;
@@ -804,7 +793,7 @@ sub move_nop { return MOVE_OK }
 sub move_player {
     my ( $cols, $rows ) = @_;
     return sub {
-        my ( $status, $msg ) = move_animate( $Animates{ HERO, }, $cols, $rows );
+        my ( $status, $msg ) = move_animate( $Animates[HERO], $cols, $rows );
         post_message($msg) if $msg;
         return $status;
     };
@@ -812,8 +801,7 @@ sub move_player {
 
 sub post_help {
     post_message('');
-    post_message(
-        ' ' . $Animates{ HERO, }[DISP] . ' - You   P - a ' . $Monst_Name );
+    post_message( ' ' . $Animates[HERO][DISP] . ' - You   P - a ' . $Monst_Name );
     post_message(
         ' ' . $Things{ STATUE, }[DISP] . ' - a large granite statue done in the' );
     post_message( '     ' . $Style . ' style' );
@@ -836,9 +824,9 @@ sub post_help {
     post_message(' ?       - post these help messages');
     post_message('');
     post_message( 'You have '
-          . $Animates{ HERO, }[STASH][BOMB_STASH]
+          . $Animates[HERO][STASH][BOMB_STASH]
           . ' bombs and '
-          . $Animates{ HERO, }[STASH][GEM_STASH]
+          . $Animates[HERO][STASH][GEM_STASH]
           . ' gems.' );
 }
 
@@ -928,12 +916,12 @@ sub rotate_right {
 }
 
 sub track_hero {
-    $Hero = $Animates{ HERO, }[LMC][WHERE];
+    $Hero = $Animates[HERO][LMC][WHERE];
 
     # route monsters to where the player will fall to as otherwise they
     # tend to freeze or head in the wrong direction
-    my $row = $Animates{ HERO, }[LMC][WHERE][PROW];
-    my $col = $Animates{ HERO, }[LMC][WHERE][PCOL];
+    my $row = $Hero->[PROW];
+    my $col = $Hero->[PCOL];
     return if $row == ROWS - 1 or $LMap->[$row][$col][GROUND][WHAT] == LADDER;
 
     my $goal = $row;
