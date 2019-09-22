@@ -37,6 +37,7 @@ my %params = (
     },
     PREREQ_PM => {
         'File::ShareDir'      => 0,
+        'Carp::Always'        => 0,
         'File::Spec'          => 0,
         'List::PriorityQueue' => 0,
         'List::Util'          => 0,
