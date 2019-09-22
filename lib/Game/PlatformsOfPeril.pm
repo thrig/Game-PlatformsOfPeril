@@ -28,9 +28,7 @@
 
 package Game::PlatformsOfPeril;
 
-our $VERSION = '0.05';
-
-use Carp::Always;
+our $VERSION = '0.06';
 
 use 5.24.0;
 use warnings;
