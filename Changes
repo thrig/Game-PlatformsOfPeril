@@ -1,7 +1,12 @@
 Revision history for Game::PlatformsOfPeril
-
-0.06    2019-09-22
-        Remove module for debugging purposes (the stack trace did not
+                                   ___        ~
+0.07    it came from below!    ,-""  ``.      ~  
+                             ,'  _   e )`-._ / 
+                            /  ,' `-._<.===-'
+                           /  /
+                          /  ;
+              _          /   ;
+ (`._    _.-"" ""--..__,'    |
         help chase down the issue).
 
 0.05    2019-09-21

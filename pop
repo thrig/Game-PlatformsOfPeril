@@ -2,15 +2,17 @@
 # ./pop - for test and debug directly from the module directory
 use 5.24.0;
 use warnings;
-BEGIN { srand 42 }
+# 2 - swinish swans
+# 10 - gruesome geese
+BEGIN { srand 12 }
 use lib qw(lib);
 use Game::PlatformsOfPeril;
 close STDERR;
-unless ( open STDERR, '>', 'log' ) {
+unless (open STDERR, '>', 'log') {
     say 'Could not redirect STDERR: ' . $!;
     exit 1;
 }
 STDERR->autoflush(1);
 my $level = shift // 0;
 my $path  = shift // 'levels';
-Game::PlatformsOfPeril::game_loop( $path, $level, 42 );
+Game::PlatformsOfPeril::game_loop($path, $level, 12);

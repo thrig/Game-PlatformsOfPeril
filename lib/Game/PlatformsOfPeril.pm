@@ -28,7 +28,7 @@
 
 package Game::PlatformsOfPeril;
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 
 use 5.24.0;
 use warnings;
@@ -159,6 +159,8 @@ our @Menagerie = (
     'Priggish Python',
     'Prurient Pachyderm',
     'Purposeful Plant',
+    'Gruesome Goose',
+    'Swinish Swan',
 );
 $Monst_Name = $Menagerie[ rand @Menagerie ];
 
@@ -478,7 +480,7 @@ sub game_loop {
       draw_level;
     post_message('The Platforms of Peril');
     post_message('');
-    post_message('Your constant foes, the ' . $Monst_Name . 's');
+    post_message('Your constant foes, the ' . properly_plural($Monst_Name));
     post_message('seek to destroy your way of life!');
     post_help();
     post_message('');
@@ -726,10 +728,11 @@ sub make_item {
 sub make_monster {
     my ($point) = @_;
     my $monst;
+    my $ch = substr $Monst_Name, 0, 1;
     # STASH replicates that of the HERO for simpler GEM handling code
     # though the BOMB_STASH is instead used for GEM_ODDS
     $monst->@[ WHAT, DISP, TYPE, STASH, UPDATE, LMC ] = (
-        MONST, "\e[1;33mP\e[0m", ANI, [ 0, 0.0 ],
+        MONST, "\e[1;33m$ch\e[0m", ANI, [ 0, 0.0 ],
         \&update_monst, $LMap->[ $point->[PROW] ][ $point->[PCOL] ]
     );
     push @Animates, $monst;
@@ -805,8 +808,10 @@ sub move_player {
 }
 
 sub post_help {
+    my $ch = substr $Monst_Name, 0, 1;
     post_message('');
-    post_message(' ' . $Animates[HERO][DISP] . ' - You   P - a ' . $Monst_Name);
+    post_message(
+        ' ' . $Animates[HERO][DISP] . ' - You   ' . $ch . ' - a ' . $Monst_Name);
     post_message(
         ' ' . $Things{ STATUE, }[DISP] . ' - a large granite statue done in the');
     post_message('     ' . $Style . ' style');
@@ -851,6 +856,12 @@ sub post_help {
             print at(MSG_COL, MSG_ROW + $i), clear_right, $log[$i];
         }
     }
+}
+
+# fsvo properly
+sub properly_plural {
+    my ($name) = @_;
+    $name =~ s/oo/ee/ ? $name : $name . 's';
 }
 
 sub redraw_level { print clear_screen, draw_level; show_messages() }
