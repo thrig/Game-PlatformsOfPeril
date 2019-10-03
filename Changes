@@ -1,7 +1,14 @@
 Revision history for Game::PlatformsOfPeril
-                                   ___        ~
-0.07    it came from below!    ,-""  ``.      ~  
-                             ,'  _   e )`-._ / 
+
+0.08    2019-10-03
+        * The management wishes to apologize for the previous changelog
+          message; those responsible have been summarily sacked.
+        * Improve bomb animation by first moving the bomb (or monster)
+          into the monster (or bomb) and only then animating that cell.
+          (My budget for special effects is obviously not very large.)
+                                   ___
+0.07    it came from below!    ,-""  ``.
+                             ,'  _   o )`-._ / 
                             /  ,' `-._<.===-'
                            /  /
                           /  ;
