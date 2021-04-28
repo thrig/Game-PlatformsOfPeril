@@ -28,7 +28,7 @@
 
 package Game::PlatformsOfPeril;
 
-our $VERSION = '0.09';
+our $VERSION = '0.10';
 
 use 5.24.0;
 use warnings;
@@ -233,7 +233,7 @@ our %Interact_With = (
         if ($mover->[WHAT] == MONST) {
             my @cells = map { kill_animate($_, 1); $_->[LMC][WHERE] } $mover, $target;
             redraw_ref(\@cells);
-            explode($mover);
+            explode($target);
         }
     },
     GEM,
